@@ -214,6 +214,9 @@ java -XX:+UnlockDiagnosticVMOptions -XX:+PrintFlagsFinal -version | egrep  "Thre
 
 > **Minor GC**：清理年轻代内存
 >
+> > 1. 复制活跃对象的时间
+> > 2. 扫描card table(老年代对象引用新生代对象)的时间
+>
 > **Major GC**：清理老年代内存
 >
 > **Full GC**：清理整个堆空间—包括年轻代和老年代
@@ -470,9 +473,70 @@ _cmsGen ->init_initiating_occupancy(CMSInitiatingOccupancyFraction, CMSTriggerRa
 
 
 
+#### CMS日志分析
+
+执行命令
+
+> cd /zhenk/gc && java -Xms20M -Xmx20M -XX:+PrintGCDetails -XX:+UseConcMarkSweepGC T15_FullGC_Problem01
+
+
+
+日志如下:
+
+
+
+```shell
+[root@base gc]# cd /zhenk/gc && java -Xms20M -Xmx20M -XX:+PrintGCDetails -XX:+UseConcMarkSweepGC T15_FullGC_Problem01
+[GC (Allocation Failure) [ParNew: 5504K->640K(6144K), 0.0110627 secs] 5504K->1124K(19840K), 0.0111325 secs] [Times: user=0.01 sys=0.00, real=0.01 secs] 
+[GC (Allocation Failure) [ParNew: 6144K->640K(6144K), 0.0144837 secs] 6628K->2750K(19840K), 0.0145301 secs] [Times: user=0.01 sys=0.00, real=0.01 secs] 
+[GC (Allocation Failure) [ParNew: 6136K->640K(6144K), 0.0253461 secs] 8247K->6148K(19840K), 0.0253948 secs] [Times: user=0.02 sys=0.00, real=0.03 secs] 
+[GC (Allocation Failure) [ParNew: 6144K->638K(6144K), 0.0207666 secs] 11652K->8779K(19840K), 0.0208153 secs] [Times: user=0.02 sys=0.00, real=0.02 secs] 
+[GC (CMS Initial Mark) [1 CMS-initial-mark: 8140K(13696K)] 8997K(19840K), 0.0012377 secs] [Times: user=0.00 sys=0.00, real=0.00 secs] 
+## 8140K(13696K)：老年代使用(最大)
+## 8997K(19840K)：整个堆使用(最大)
+## 调整-XX:CMSInitiatingOccupancyFraction这个参数可以当在老年代使用被占用比例时启动CMS,应该要根据情况来进行调大调小。
+[CMS-concurrent-mark-start]
+[CMS-concurrent-mark: 0.013/0.013 secs] [Times: user=0.01 sys=0.00, real=0.01 secs] 
+[CMS-concurrent-preclean-start]
+[CMS-concurrent-preclean: 0.004/0.004 secs] [Times: user=0.00 sys=0.00, real=0.01 secs] 
+[GC (CMS Final Remark) [YG occupancy: 1661 K (6144 K)][Rescan (parallel) , 0.0012780 secs][weak refs processing, 0.0000174 secs][class unloading, 0.0008297 secs][scrub symbol table, 0.0006420 secs][scrub string table, 0.0001336 secs][1 CMS-remark: 8140K(13696K)] 9802K(19840K), 0.0030359 secs] [Times: user=0.00 sys=0.00, real=0.00 secs] 
+[CMS-concurrent-sweep-start]
+[CMS-concurrent-sweep: 0.013/0.013 secs] [Times: user=0.01 sys=0.00, real=0.01 secs] 
+[CMS-concurrent-reset-start]
+[CMS-concurrent-reset: 0.000/0.000 secs] [Times: user=0.00 sys=0.00, real=0.00 secs] 
+[GC (CMS Initial Mark) [1 CMS-initial-mark: 8078K(13696K)] 10171K(19840K), 0.0020945 secs] [Times: user=0.01 sys=0.00, real=0.00 secs] 
+[CMS-concurrent-mark-start]
+[CMS-concurrent-mark: 0.021/0.021 secs] [Times: user=0.01 sys=0.00, real=0.03 secs] 
+[CMS-concurrent-preclean-start]
+[CMS-concurrent-preclean: 0.002/0.002 secs] [Times: user=0.00 sys=0.00, real=0.00 secs] 
+[GC (CMS Final Remark) [YG occupancy: 2093 K (6144 K)][Rescan (parallel) , 0.0029122 secs][weak refs processing, 0.0000150 secs][class unloading, 0.0013447 secs][scrub symbol table, 0.0005472 secs][scrub string table, 0.0001642 secs][1 CMS-remark: 8078K(13696K)] 10171K(19840K), 0.0051107 secs] [Times: user=0.00 sys=0.00, real=0.01 secs] 
+[CMS-concurrent-sweep-start]
+[CMS-concurrent-sweep: 0.004/0.004 secs] [Times: user=0.01 sys=0.00, real=0.00 secs] 
+[CMS-concurrent-reset-start]
+[CMS-concurrent-reset: 0.000/0.000 secs] [Times: user=0.00 sys=0.00, real=0.00 secs] 
+[GC (CMS Initial Mark) [1 CMS-initial-mark: 8077K(13696K)] 10602K(19840K), 0.0031134 secs] [Times: user=0.00 sys=0.00, real=0.00 secs] 
+[CMS-concurrent-mark-start]
+[CMS-concurrent-mark: 0.022/0.022 secs] [Times: user=0.02 sys=0.00, real=0.02 secs] 
+[CMS-concurrent-preclean-start]
+[CMS-concurrent-preclean: 0.008/0.008 secs] [Times: user=0.00 sys=0.00, real=0.01 secs] 
+^CHeap
+ par new generation   total 6144K, used 2603K [0x00000000fec00000, 0x00000000ff2a0000, 0x00000000ff2a0000)
+  eden space 5504K,  47% used [0x00000000fec00000, 0x00000000fee8ae80, 0x00000000ff160000)
+  from space 640K,   0% used [0x00000000ff160000, 0x00000000ff160000, 0x00000000ff200000)
+  to   space 640K,   0% used [0x00000000ff200000, 0x00000000ff200000, 0x00000000ff2a0000)
+ concurrent mark-sweep generation total 13696K, used 13695K [0x00000000ff2a0000, 0x0000000100000000, 0x0000000100000000)
+ Metaspace       used 3863K, capacity 4648K, committed 4864K, reserved 1056768K
+  class space    used 420K, capacity 455K, committed 512K, reserved 1048576K
+
+```
+
+
+
+
+
 #### G1收集器
 
->  分代是在逻辑上分代，物理方面不分代，则G1的内存区域不是固定的E或者O。G1中的新老年代比例是动态的,是根据内存模型的改变产生的。分而治之的思想。
+>  分代是在逻辑上分代，物理方面不分代，是**服务端垃圾收集器**，则G1的内存区域不是固定的E或者O。G1中的新老年代比例是动态的,是根据内存模型的改变产生的。采用了分而治之的思想。
 >
 >  * The [Garbage First Garbage Collector (G1 GC)](https://www.oracle.com/technetwork/java/javase/tech/g1-intro-jsp-135488.html) is the low-pause, server-style generational garbage collector for Java HotSpot VM. The G1 GC uses concurrent and parallel phases to achieve its target pause time and to maintain good throughput. When G1 GC determines that a garbage collection is necessary, it collects the regions with the least live data first (garbage first).
 >
@@ -506,27 +570,15 @@ _cmsGen ->init_initiating_occupancy(CMSInitiatingOccupancyFraction, CMSTriggerRa
 > G1按照堆进行划分:
 >
 > * Humongous为大对象,占用内存可能是4k,或者3k等等。
+> * 一个Region的大小可以通过参数-XX:G1HeapRegionSize设定,取值范围从1M到32M，是2的指数。如果不设定，那么G1会根据Heap大小自动设定
 
 ![G1的内存模型](image/G1内存模型.png)
 
-
-
-##### Why G1
-
-> * 追求吞吐量
->   * 100 CPU
->   * 99 app 1 GC
->   * 吞吐量 = 99%
-> * 追求响应时间
->   * XX:MaxGCPauseMillis 200
->   * 对STW进行控制
-> * 灵活
->   * 分Region回收
->   * 优先回收花费时间少，垃圾比例高的Region
+![每个Region占用的虚拟内存](image/每个Region占用的虚拟内存.png)
 
 ##### 每个Region有多大
 
-> heapRegion.hpp
+> heapRegion.hpp中调用了此``src\share\vm\gc_implementation\g1\heapRegionBounds.hpp``路径下的方法
 
 ```cpp
 #ifndef SHARE_VM_GC_IMPLEMENTATION_G1_HEAPREGIONBOUNDS_HPP
@@ -559,9 +611,94 @@ public:
 #endif // SHARE_VM_GC_IMPLEMENTATION_G1_HEAPREGIONBOUNDS_HPP
 ```
 
-* 取值：1M~32M,2的二次幂
-* 手工指定：XX:G1HeapRegionSize
-* 新老年代比例：5%~60%，一般不用手工指定，因为这比例是G1预测停顿时间的基准。
+- 取值：1M~32M,2的二次幂,从以下代码可以查看region_size的值在[MIN_REGION_SIZE,MAX_REGION_SIZE]之间。
+
+```cpp
+  // Now make sure that we don't go over or under our limits.
+  if (region_size < HeapRegionBounds::min_size()) {
+    region_size = HeapRegionBounds::min_size();
+  } else if (region_size > HeapRegionBounds::max_size()) {
+    region_size = HeapRegionBounds::max_size();
+  }
+```
+
+- 手工指定：XX:G1HeapRegionSize
+- 新老年代比例：5%~60%，一般不用手工指定，因为这比例是G1预测停顿时间的基准。
+
+```cpp
+//share/vm/gc_implementation/g1/heapRegionBounds.hpp
+// Minimum region size; we won't go lower than that.
+// We might want to decrease this in the future, to deal with small
+// heaps a bit more efficiently.
+#define MIN_REGION_SIZE  (      1024 * 1024 )
+// Maximum region size; we don't go higher than that. There's a good
+// reason for having an upper bound. We don't want regions to get too
+// large, otherwise cleanup's effectiveness would decrease as there
+// will be fewer opportunities to find totally empty regions after
+// marking.
+#define MAX_REGION_SIZE  ( 32 * 1024 * 1024 )
+// The automatic region size calculation will try to have around this
+// many regions in the heap (based on the min heap size).
+#define TARGET_REGION_NUMBER          2048
+```
+
+```cpp
+// share/vm/gc_implementation/g1/heapRegion.cpp
+
+//在Jdk1.8和之后以上的属性已没有,改成到了调用HeapRegionBounds::target_number()方法和HeapRegionBounds::min_size()
+size_t HeapRegion::max_region_size() {
+  return (size_t)MAX_REGION_SIZE;
+}
+
+// 这个方法是计算region的核心实现
+void HeapRegion::setup_heap_region_size(size_t initial_heap_size, size_t max_heap_size) {
+  uintx region_size = G1HeapRegionSize;
+  // 是否设置了G1HeapRegionSize参数，如果没有配置，那么按照下面的方法计算；如果设置了G1HeapRegionSize就按照设置的值计算,一个Region大小可以通过-XX:G1HeapRegionSize设置
+  if (FLAG_IS_DEFAULT(G1HeapRegionSize)) {
+    // average_heap_size即平均堆的大小，(初始化堆的大小即Xms+最大堆的大小即Xmx)/2
+    size_t average_heap_size = (initial_heap_size + max_heap_size) / 2;
+    // average_heap_size除以期望的REGION数量得到每个REGION的SIZE，与MIN_REGION_SIZE取两者中的更大值就是实际的REGION_SIZE；从这个计算公式可知，默认情况下如果JVM堆在2G（TARGET_REGION_NUMBER*MIN_REGION_SIZE）以下，那么每个REGION_SIZE都是1M；
+    region_size = MAX2(average_heap_size / TARGET_REGION_NUMBER, (uintx) MIN_REGION_SIZE);
+  }
+
+  // region_size的对数值
+  int region_size_log = log2_long((jlong) region_size);
+  // 重新计算region_size，确保它是最大的小于或等于region_size的2的N次方的数值，例如重新计算前region_size=33，那么重新计算后region_size=32；重新计算前region_size=16，那么重新计算后region_size=16；
+  // Recalculate the region size to make sure it's a power of
+  // 2. This means that region_size is the largest power of 2 that's
+  // <= what we've calculated so far.
+  region_size = ((uintx)1 << region_size_log);
+
+  // 确保计算出来的region_size不能比MIN_REGION_SIZE更小，也不能比MAX_REGION_SIZE更大
+  // Now make sure that we don't go over or under our limits.
+  if (region_size < MIN_REGION_SIZE) {
+    region_size = MIN_REGION_SIZE;
+  } else if (region_size > MAX_REGION_SIZE) {
+    region_size = MAX_REGION_SIZE;
+  }
+
+  // 与MIN_REGION_SIZE和MAX_REGION_SIZE比较后，再次重新计算region_size
+  // And recalculate the log.
+  region_size_log = log2_long((jlong) region_size);
+}
+```
+
+
+
+
+
+##### Why G1
+
+> * 追求吞吐量
+>   * 100 CPU
+>   * 99 app 1 GC
+>   * 吞吐量 = 99%
+> * 追求响应时间
+>   * XX:MaxGCPauseMillis 200
+>   * 对STW进行控制
+> * 灵活
+>   * 分Region回收
+>   * 优先回收花费时间少，垃圾比例高的Region
 
 
 
@@ -583,6 +720,56 @@ public:
 * FGC
   * Old空间不足
   * System.gc()
+
+##### G1日志分析
+
+命令:
+
+```shell
+[root@base gc]# cd /zhenk/gc && java -Xms20M -Xmx20M -XX:+PrintGCDetails -XX:+UseG1GC T15_FullGC_Problem01
+```
+
+```shell
+[GC pause (G1 Evacuation Pause) (young) (initial-mark), 0.0040480 secs]
+   [Parallel Time: 3.9 ms, GC Workers: 1]
+      [GC Worker Start (ms):  94582.8]
+      [Ext Root Scanning (ms):  0.3]
+      [Update RS (ms):  0.0]
+         [Processed Buffers:  1]
+      [Scan RS (ms):  0.0]
+      [Code Root Scanning (ms):  0.0]
+      [Object Copy (ms):  0.0]
+      [Termination (ms):  0.0]
+         [Termination Attempts:  1]
+      [GC Worker Other (ms):  0.0]
+      [GC Worker Total (ms):  0.4]
+      [GC Worker End (ms):  94583.2]
+   [Code Root Fixup: 0.0 ms]
+   [Code Root Purge: 0.0 ms]
+   [Clear CT: 0.0 ms]
+   [Other: 0.1 ms]
+      [Choose CSet: 0.0 ms]
+      [Ref Proc: 0.1 ms]
+      [Ref Enq: 0.0 ms]
+      [Redirty Cards: 0.0 ms]
+      [Humongous Register: 0.0 ms]
+      [Humongous Reclaim: 0.0 ms]
+      [Free CSet: 0.0 ms]
+   [Eden: 0.0B(1024.0K)->0.0B(1024.0K) Survivors: 0.0B->0.0B Heap: 19.1M(20.0M)->19.1M(20.0M)]
+ [Times: user=0.00 sys=0.00, real=0.00 secs] 
+[GC concurrent-root-region-scan-start]
+[GC concurrent-root-region-scan-end, 0.0000126 secs]
+[GC concurrent-mark-start]
+[Full GC (Allocation Failure)  19M->19M(20M), 0.1638340 secs]
+   [Eden: 0.0B(1024.0K)->0.0B(1024.0K) Survivors: 0.0B->0.0B Heap: 19.1M(20.0M)->19.1M(20.0M)], [Metaspace: 3857K->3857K(1056768K)]
+ [Times: user=0.09 sys=0.00, real=0.17 secs] 
+[Full GC (Allocation Failure)  19M->19M(20M), 0.1173742 secs]
+   [Eden: 0.0B(1024.0K)->0.0B(1024.0K) Survivors: 0.0B->0.0B Heap: 19.1M(20.0M)->19.1M(20.0M)], [Metaspace: 3857K->3857K(1056768K)]
+ [Times: user=0.06 sys=0.00, real=0.11 secs] 
+[GC concurrent-mark-abort]
+```
+
+
 
 
 
@@ -608,12 +795,6 @@ public:
 
 
 ![1578895611598](image/1578895611598.png)
-
-
-
-
-
-#### FGC
 
 
 
@@ -755,7 +936,6 @@ Heap
 > * Clazz
 
 
-
 ## GC算法标准分类
 
 ### 基本概念
@@ -764,27 +944,25 @@ Heap
 
 #### Card Table
 
-> * YGC/FGC每个分区分card，用来记录一个个对象是否为垃圾对象，在O区中分配一小部分空间作为以BitMap来实现的一个个二进制码代表Card标识，在O区中持有Y取对象的引用，进行YGC的时候此时不需要进行O区全区扫描，只需要扫描Card Table的Dirty标识的对象。
->
-> * CMS中为了提高重新标记的效率，并发标记阶段会把这些发生变化的对象所在的Card标识为Dirty，这样后续阶段就只需要扫描这些Dirty Card的对象，从而避免扫描整个老年代。
->
-> * 在老年代有一个write barrier（写屏障）来管理的card table（卡表），card table存放了所有老年代对象对新生代对象的引用。所以每次minor gc通过查询card table来避免查询整个老年代，以此来提高gc性能。
-> * 跨代引用使用到的技术，Card标记大小也就是页的大小1M~32M，2的二次幂区间。
+【跨代引用技术】
+
+> * CMS中为了提高重新标记的效率，并发标记阶段中，在O区中分配一小部分空间以一个个BitMap方式来实现的二进制码代表Card作为标识记录着持有Y区对象的引用，进行YGC的时候此时不需要进行O区全区扫描，只需要扫描Card Table的Dirty标识的对象。卡表的数量取决于老年代的大小和每张卡对应的内存大小，Card标记大小也就是页的大小1M~32M，2的指数区间。
+> * 在老年代有一个write barrier（写屏障）来管理的card table（卡表），card table存放了所有老年代对象对新生代对象的引用。所以每次minor gc通过查询card table来避免查询整个老年代，以此来提高gc性能。当一个对象引用进行写屏障(对象引用改变),写屏障逻辑将会标记对象所在的卡页为Dirty。
 
 ##### CardTable的设计
 
 > 基于卡表（Card Table）的设计，通常将堆空间划分为一系列2次幂大小的卡页（Card Page）。
-> 卡表（Card Table），用于标记卡页的状态，每个卡表项对应一个卡页。
+> 卡表（Card Table），用于标记卡页的状态，每个卡表项对应一个卡页(卡页Card Page大小为512字节是在老年代区域中)。
 
 ![cardTable](image/cardtable.png)
+
+![CardTable和Card之间关系](image/CardTable和Card之间关系.png)![JVM分配到的内存堆](image/JVM分配到的内存堆.png)
 
 ##### CarTable之源码解析
 
 
 
 使用一个GenRemSet数据结构，记录包含这些对象的内存区域是clean or dirty状态。
-
-
 
 ![RSet内存模型](image/RSet内存模型.png)
 
@@ -878,7 +1056,29 @@ if (start_of_non_clean < end_of_non_clean) {
 
 
 
-##### RSet
+##### 问题
+
+###### 高并发下虚共享带来的性能开销
+
+> 在高并发场景下,频发的写屏障容易出现虚共享,所以在标记之前必须判断是否被标记,如果未标记就进行对卡页进行标记。
+
+
+
+##### 卡标记简化逻辑
+
+`CARD_TABLE [this address >> 9] = 0;`
+
+首先，计算对象引用所在卡页的卡表索引号。将地址右移9位，相当于用地址除以512（2的9次方）。可以这么理解，假设卡表卡页的起始地址为0，那么卡表项0、1、2对应的卡页起始地址分别为0、512、1024（卡表项索引号乘以卡页512字节）。
+
+其次，通过卡表索引号，设置对应卡标识为dirty。
+
+**64byte的卡表共享缓存行:**
+
+![64byte的卡表共享缓存行](image/卡表共享缓存行.png)
+
+
+
+#### RSet
 
 引用集合
 
@@ -896,7 +1096,7 @@ No Silver Bullet
 
 
 
-##### CSet
+#### CSet
 
 > CSet =Collection Set
 >
@@ -987,7 +1187,33 @@ No Silver Bullet
 
 > incremental update --增量更新，跟踪黑色标记指向白色标记引用的增加，重新把黑色标记标成灰色，下次重新扫描属性。CMS使用的算法
 >
-> STAB snapshot at the beginning --跟踪灰色标记指向白色标记引用的消失，当B->D引用消失时GC线程会把把这个指向D的**引用**(B指向D的引用)推到GC的堆栈，保证D还能别GC扫描到，由于RSet的存在不需要扫描整个堆去查找指向白色的引用，效率比较高，STAB配合RSet使用。
+> STAB snapshot at the beginning --跟踪灰色标记指向白色标记引用的消失，当B->D引用消失时GC线程会把把这个指向D的**引用**(B指向D的引用)推到GC的堆栈，保证D还能别GC扫描到，由于RSet的存在不需要扫描整个堆去查找指向白色的引用，效率比较高，STAB配合RSet使用。可以通过`write barrier`将旧引用记录下来：
+
+```cpp
+//  share/vm/gc_implementation/g1/g1SATBCardTableModRefBS.hpp
+// This notes that we don't need to access any BarrierSet data
+// structures, so this can be called from a static context.
+template <class T> static void write_ref_field_pre_static(T* field, oop newVal) {
+  T heap_oop = oopDesc::load_heap_oop(field);
+  if (!oopDesc::is_null(heap_oop)) {
+    enqueue(oopDesc::decode_heap_oop(heap_oop));
+  }
+}
+// share/vm/gc_implementation/g1/g1SATBCardTableModRefBS.cpp
+void G1SATBCardTableModRefBS::enqueue(oop pre_val) {
+  // Nulls should have been already filtered.
+  assert(pre_val->is_oop(true), "Error");
+  if (!JavaThread::satb_mark_queue_set().is_active()) return;
+  Thread* thr = Thread::current();
+  if (thr->is_Java_thread()) {
+    JavaThread* jt = (JavaThread*)thr;
+    jt->satb_mark_queue().enqueue(pre_val);
+  } else {
+    MutexLockerEx x(Shared_SATB_Q_lock, Mutex::_no_safepoint_check_flag);
+    JavaThread::satb_mark_queue_set().shared_satb_queue()->enqueue(pre_val);
+  }
+}
+```
 
 ![1578898557574](image/1578898557574.png)
 
@@ -1188,11 +1414,11 @@ Heap
 
 ### 调优之前概念
 
-* **吞吐量（Throughput-TPS）：**系统吞吐量时间。用户代码执行时间/(用户代码执行时间+垃圾回收执行时间)
+* **吞吐量（Throughput-TPS）**：系统吞吐量时间。用户代码执行时间/(用户代码执行时间+垃圾回收执行时间)
 
-* **响应时间（RT）：**用户线程停顿时间,STW越短响应时间越好。一般取平均响应时间
+* **响应时间（RT）**：用户线程停顿时间,STW越短响应时间越好。一般取平均响应时间
 
-* **QPS（TPS）：**每秒钟request/事务 数量
+* **QPS（TPS）**：每秒钟request/事务 数量
 
   > 原理：每天80%的访问集中在20%的时间里，这20%时间叫做峰值时间。
   >
@@ -1206,9 +1432,9 @@ Heap
   >
   > 一般需要达到139QPS，因为是峰值。
 
-* **并发数：** 系统同时处理的request/事务数
+* **并发数**： 系统同时处理的request/事务数
 
-* **日PV：**拿到日流量图和QPS可以推算日流量PV
+* **日PV**：拿到日流量图和QPS可以推算日流量PV
 
 > 并发峰值(一秒并发最多访问值)
 
@@ -1229,7 +1455,6 @@ Heap
 
 ```java
 //在Linux中java类中应该去掉package,不然在java执行class类的时候出现Error: Could not find or load main class
-
 
 ```
 
@@ -1306,15 +1531,111 @@ Heap
 
 
 
+## GC常用参数
+
+- -Xmn -Xms -Xmx -Xss
+  年轻代 最小堆 最大堆 栈空间
+
+- -XX:+UseTLAB
+  使用TLAB，默认打开
+
+- -XX:+PrintTLAB
+  打印TLAB的使用情况
+
+- -XX:TLABSize
+  设置TLAB大小
+
+- -XX:+DisableExplictGC
+  System.gc()不管用 ，FGC
+
+- -XX:+PrintGC
+
+  打印GC日志信息
+
+- -XX:+PrintGCDetails
+
+  打印GC详细信息
+
+- -XX:+PrintHeapAtGC
+
+  打印在GC上堆信息
+
+- -XX:+PrintGCTimeStamps
+
+  打印GC日志执行的系统时间
+
+- -XX:+PrintGCApplicationConcurrentTime (低)
+  打印应用程序时间
+
+- -XX:+PrintGCApplicationStoppedTime （低）
+  打印暂停时长
+
+- -XX:+PrintReferenceGC （重要性低）
+  记录回收了多少种不同引用类型的引用
+
+- -verbose:class
+  类加载详细过程
+
+- -XX:+PrintVMOptions
+
+  打印JVM运行时参数
+
+- -XX:+PrintFlagsFinal  -XX:+PrintFlagsInitial
+
+  配合使用:java -XX:+PrintFlagsFinal -version |grep G1
+
+  查找相关垃圾收集器所涉及的参数
+
+- -Xloggc:opt/log/gc.log
+
+- -XX:MaxTenuringThreshold
+  升代年龄，最大值15
+
+- 锁自旋次数 -XX:PreBlockSpin 热点代码检测参数-XX:CompileThreshold 逃逸分析 标量替换 ... 
+  这些不建议设置
+
+
+
 ## ParallelGC常用参数
 
-
+- -XX:SurvivorRatio
+- -XX:PreTenureSizeThreshold
+  大对象到底多大
+- -XX:MaxTenuringThreshold
+- -XX:+ParallelGCThreads
+  并行收集器的线程数，同样适用于CMS，一般设为和CPU核数相同
+- -XX:+UseAdaptiveSizePolicy
+  自动选择各区大小比例
 
 ## CMS常用参数
+
+* -XX:+UseConcMarkSweepGC
+* -XX:ParallelCMSThreads
+  CMS线程数量
+* -XX:CMSInitiatingOccupancyFraction
+  使用多少比例的老年代后开始CMS收集，默认是68%(近似值)，如果频繁发生SerialOld卡顿，应该调小，（频繁CMS回收）
+* -XX:+UseCMSCompactAtFullCollection
+  在FGC时进行压缩
+* -XX:CMSFullGCsBeforeCompaction
+  多少次FGC之后进行压缩
+* -XX:+CMSClassUnloadingEnabled
+* -XX:CMSInitiatingPermOccupancyFraction
+  达到什么比例时进行Perm回收
+* GCTimeRatio
+  设置GC时间占用程序运行时间的百分比
+* -XX:MaxGCPauseMillis
+  停顿时间，是一个建议时间，GC会尝试用各种手段达到这个时间，比如减小年轻代
 
 
 
 ## G1常用参数
+
+```shell
+-XX:+UseG1GC #开启G1垃圾收集器
+-XX:MaxGCPauseMillis=200 #设置GC的最大暂停时间为200ms
+```
+
+
 
 
 
@@ -1337,3 +1658,7 @@ http://sergiomartinrubio.com/articles/java-memory-model-overview#garbage-collect
 [promotion failed和concurrent mode failure](https://blog.csdn.net/rubbertree/article/details/87270914)
 
 [垃圾收集与内存分配策略(4)（JVM笔记）](https://www.jianshu.com/p/a230e641ce0e)
+
+[内存管理词汇表](https://www.memorymanagement.org/glossary/b.html#term-barrier-1)
+
+[掘金-JVM之卡表（Card Table）](https://juejin.im/post/5c39920b6fb9a049e82bbf94)
